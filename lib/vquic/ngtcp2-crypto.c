@@ -232,22 +232,17 @@ size_t Curl_qc_aead_max_overhead(const struct Context *ctx)
   return aead_tag_length(ctx);
 }
 
-ssize_t Curl_qc_encrypt(uint8_t *dest, size_t destlen,
-                        const uint8_t *plaintext, size_t plaintextlen,
-                        const struct Context *ctx,
-                        const uint8_t *key, size_t keylen,
-                        const uint8_t *nonce, size_t noncelen,
-                        const uint8_t *ad, size_t adlen)
+int Curl_qc_encrypt(uint8_t *dest,
+                    const uint8_t *plaintext, size_t plaintextlen,
+                    const struct Context *ctx,
+                    const uint8_t *key,
+                    const uint8_t *nonce, size_t noncelen,
+                    const uint8_t *ad, size_t adlen)
 {
   size_t taglen = aead_tag_length(ctx);
   EVP_CIPHER_CTX *actx;
-  size_t outlen = 0;
+  int outlen = 0;
   int len;
-  (void)keylen;
-
-  if(destlen < plaintextlen + taglen) {
-    return -1;
-  }
 
   actx = EVP_CIPHER_CTX_new();
   if(!actx)
@@ -282,13 +277,12 @@ ssize_t Curl_qc_encrypt(uint8_t *dest, size_t destlen,
     goto error;
 
   outlen += len;
-  assert(outlen + taglen <= destlen);
 
   if(EVP_CIPHER_CTX_ctrl(actx, EVP_CTRL_AEAD_GET_TAG,
                          (int)taglen, dest + outlen) != 1)
     goto error;
 
-  outlen += taglen;
+  outlen += (int)taglen;
 
   EVP_CIPHER_CTX_free(actx);
   return outlen;
@@ -298,21 +292,20 @@ ssize_t Curl_qc_encrypt(uint8_t *dest, size_t destlen,
   return -1;
 }
 
-ssize_t Curl_qc_decrypt(uint8_t *dest, size_t destlen,
-                        const uint8_t *ciphertext, size_t ciphertextlen,
-                        const struct Context *ctx,
-                        const uint8_t *key, size_t keylen,
-                        const uint8_t *nonce, size_t noncelen,
-                        const uint8_t *ad, size_t adlen)
+int Curl_qc_decrypt(uint8_t *dest,
+                    const uint8_t *ciphertext, size_t ciphertextlen,
+                    const struct Context *ctx,
+                    const uint8_t *key,
+                    const uint8_t *nonce, size_t noncelen,
+                    const uint8_t *ad, size_t adlen)
 {
   size_t taglen = aead_tag_length(ctx);
   const uint8_t *tag;
   EVP_CIPHER_CTX *actx;
-  size_t outlen;
+  int outlen;
   int len;
-  (void)keylen;
 
-  if(taglen > ciphertextlen || destlen + taglen < ciphertextlen) {
+  if(taglen > ciphertextlen) {
     return -1;
   }
 
@@ -489,19 +482,13 @@ Curl_qc_derive_header_protection_key(uint8_t *dest, size_t destlen,
   return keylen;
 }
 
-ssize_t Curl_qc_hp_mask(uint8_t *dest, size_t destlen,
-                        const struct Context *ctx,
-                        const uint8_t *key, size_t keylen,
-                        const uint8_t *sample, size_t samplelen)
+int Curl_qc_hp_mask(uint8_t *dest, const struct Context *ctx,
+                    const uint8_t *key, const uint8_t *sample)
 {
   static uint8_t PLAINTEXT[] = "\x00\x00\x00\x00\x00";
   EVP_CIPHER_CTX *actx;
-  size_t outlen = 0;
+  int outlen = 0;
   int len;
-  (void)destlen; /* TODO: make use of these! */
-  (void)keylen;
-  (void)samplelen;
-
   actx = EVP_CIPHER_CTX_new();
   if(!actx)
     return -1;
